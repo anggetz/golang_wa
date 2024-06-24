@@ -1,4 +1,4 @@
-module golangwa
+module github.com/anggetz/golangwa
 
 go 1.22.2
 

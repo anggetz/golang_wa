@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golangwa/kernel"
-	"golangwa/pubsup"
+
+	"github.com/anggetz/golangwa/kernel"
+	"github.com/anggetz/golangwa/pubsup"
 
 	"github.com/nats-io/nats.go"
 	"go.mau.fi/whatsmeow"

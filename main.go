@@ -5,15 +5,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"golangwa/kernel"
-	"golangwa/pubsup"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	naNwa "golangwa/pubsup/nats"
+	"github.com/anggetz/golangwa/kernel"
+	"github.com/anggetz/golangwa/pubsup"
+
+	naNwa "github.com/anggetz/golangwa/pubsup/nats"
 
 	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
