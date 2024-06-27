@@ -6,7 +6,7 @@ import (
 )
 
 type Whatsapp interface {
-	Login() ([]byte, error)
+	GetQRCOde() ([]byte, error)
 	SetBase64QrCode(string)
 	GetDevices() ([]*store.Device, error)
 	SetAktifSender(jid string)
@@ -15,9 +15,15 @@ type Whatsapp interface {
 	GetClient() *whatsmeow.Client
 	SetClient(*whatsmeow.Client)
 	IsLoggedIn() bool
+	RequestQRCode(chan string)
+	GetPairCode(number string) string
 }
 
 type WaSend struct {
 	Jid     string
 	Message string
+}
+
+type PairCode struct {
+	Number string
 }

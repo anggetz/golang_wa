@@ -1,14 +1,10 @@
 package main
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/anggetz/golangwa/kernel"
@@ -18,7 +14,6 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
-	qrCode "github.com/skip2/go-qrcode"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types/events"
@@ -29,44 +24,6 @@ func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
 	case *events.Message:
 		fmt.Println("Received a message!", v.Message.GetConversation())
-	}
-}
-
-func NewClientWA(implementor pubsup.Whatsapp, clientLog *waLog.Logger) {
-	var err error
-
-	client := whatsmeow.NewClient(implementor.GetStoreDevice(), *clientLog)
-	client.AddEventHandler(eventHandler)
-
-	implementor.SetClient(client)
-
-	if client.Store.ID == nil {
-		// No ID stored, new login
-		qrChan, _ := client.GetQRChannel(context.Background())
-		err = client.Connect()
-		if err != nil {
-			panic(err)
-		}
-		for evt := range qrChan {
-			if evt.Event == "code" {
-				// Render the QR code here
-				// e.g. qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-				// or just manually `echo 2@... | qrencode -t ansiutf8` in a terminal
-				qrPNG, _ := qrCode.Encode(evt.Code, qrCode.Medium, 256)
-
-				Base64QrCode := base64.StdEncoding.EncodeToString(qrPNG)
-
-				implementor.SetBase64QrCode(Base64QrCode)
-			} else {
-				fmt.Println("Login event:", evt.Event)
-			}
-		}
-	} else {
-		// Already logged in, just connect
-		err = client.Connect()
-		if err != nil {
-			panic(err)
-		}
 	}
 }
 
@@ -103,15 +60,15 @@ func main() {
 		kernel.Kernel.Config.DB.Password,
 		kernel.Kernel.Config.DB.Host,
 		kernel.Kernel.Config.DB.Port,
-		kernel.Kernel.Config.DB.Database,
+		"simada_whatsapp",
 	), dbLog)
 
 	defer container.Close()
 
 	// register nats
-	natsWaImpl := new(naNwa.NatsWa)
+	logicImpl := new(pubsup.PubSupLogic)
 
-	natsWaImpl.ContainerSqlStore = container
+	logicImpl.ContainerSqlStore = container
 
 	if err != nil {
 		panic(err)
@@ -124,12 +81,15 @@ func main() {
 
 	clientLogger := waLog.Stdout("Client", "DEBUG", true)
 
-	natsWaImpl.Logger = &clientLogger
-	natsWaImpl.CurrentDevice = deviceStore
+	logicImpl.Logger = &clientLogger
+	logicImpl.CurrentDevice = deviceStore
 
-	NewClientWA(natsWaImpl, &clientLogger)
+	// NewClientWA(logicImpl, &clientLogger)
+	client := whatsmeow.NewClient(logicImpl.CurrentDevice, *&clientLogger)
 
-	naNwa.RegisterHandler(nc, natsWaImpl)
+	logicImpl.SetClient(client)
+
+	naNwa.RegisterHandler(nc, logicImpl)
 
 	// go func() {
 	// 	for {
@@ -139,10 +99,26 @@ func main() {
 	// 		}
 	// 	}
 	// }()
+	// if logicImpl.Client.Store.ID != nil {
+	// 	// No ID stored, new login
+	// 	err = logicImpl.Client.Connect()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
+	// 	log.Println("logged in")
+	// }
+	logicImpl.Client.Connect()
 
-	natsWaImpl.Client.Disconnect()
+	defer logicImpl.Client.Disconnect()
+
+	for {
+		if logicImpl.Client.IsConnected() {
+			logicImpl.Client.Connect()
+		}
+
+		fmt.Println("keep alive manual")
+		time.Sleep(2 * time.Second)
+	}
+
 }
